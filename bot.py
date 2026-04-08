@@ -156,6 +156,55 @@ def handle_oh(state):
     today = datetime.date.today()
     send_message(f"☕ Oggi ({today.strftime('%A %d/%m')}) tocca a *{payer}*!", parse_mode="Markdown")
 
+def handle_index():
+    """
+    /index  →  Current market price of Arabica coffee futures (KC=F) from Yahoo Finance.
+    Uses the Yahoo Finance v8 chart API — no API key required.
+    """
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/KC=F"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+
+        meta = data["chart"]["result"][0]["meta"]
+        price = meta.get("regularMarketPrice")
+        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+        currency = meta.get("currency", "USD")
+        name = meta.get("shortName", "Arabica Coffee Futures")
+        ts = meta.get("regularMarketTime")
+        dt_str = ""
+        if ts:
+            dt_str = datetime.datetime.utcfromtimestamp(ts).strftime("%d/%m/%Y %H:%M UTC")
+
+        if price is None:
+            send_message("⚠️ Prezzo non disponibile al momento. Riprova tra poco.")
+            return
+
+        # Price is in cents/pound — convert to $/pound and $/kg for context
+        price_usd_lb = price / 100
+        price_usd_kg = price_usd_lb * 2.20462
+
+        change_str = ""
+        if prev_close:
+            change = price - prev_close
+            pct = (change / prev_close) * 100
+            arrow = "📈" if change >= 0 else "📉"
+            sign = "+" if change >= 0 else ""
+            change_str = f"\n{arrow} Variazione: {sign}{change:.2f}¢ ({sign}{pct:.2f}%)"
+
+        msg = (
+            f"☕ *Caffè Arabica — Futures ({name})*\n\n"
+            f"💵 Prezzo: *{price:.2f}¢/lb* ({price_usd_lb:.2f} $/lb · {price_usd_kg:.2f} $/kg)"
+            f"{change_str}\n"
+            f"🕐 Aggiornato: {dt_str}"
+        )
+        send_message(msg, parse_mode="Markdown")
+
+    except Exception as e:
+        send_message(f"⚠️ Impossibile recuperare il prezzo del caffè: {e}")
+
 def dispatch_command(text, state):
     parts = text.strip().split()
     # Strip bot mention if present (e.g. /skip@MyBot)
@@ -172,6 +221,8 @@ def dispatch_command(text, state):
         handle_paid(args, state)
     elif cmd == "/oh":
         handle_oh(state)
+    elif cmd == "/index":
+        handle_index()
     elif cmd == "/help":
         send_message(
             "☕ *Coffee Bot comandi:*\n\n"
@@ -179,7 +230,8 @@ def dispatch_command(text, state):
             "/extra — Caffè extra: chi paga?\n"
             "/skip [nome] — Salta il turno di qualcuno (debito +1)\n"
             "/paid [nome] — Segna che qualcuno ha saldato un debito\n"
-            "/debt — Mostra i debiti di tutti",
+            "/debt — Mostra i debiti di tutti\n"
+            "/index — Prezzo attuale del caffè Arabica (futures)",
             parse_mode="Markdown"
         )
 
