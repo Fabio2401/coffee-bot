@@ -9,7 +9,7 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = os.getenv("GITHUB_REPO")  # e.g. "username/coffee-bot"
-PEOPLE = ["Fabio", "Gabri", "Bounk", "Bottaz"]
+PEOPLE = ["Fabio", "Gabri", "Bonuk", "Bottaz"]
 STATE_FILE = "state.json"
 
 # ---------------------------------------------------------------------------
