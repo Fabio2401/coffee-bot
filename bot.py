@@ -12,6 +12,11 @@ GITHUB_REPO = os.getenv("GITHUB_REPO")  # e.g. "username/coffee-bot"
 PEOPLE = ["Fabio", "Gabri", "Bonuk", "Bottaz"]
 STATE_FILE = "state.json"
 
+DAYS_IT = {
+    0: "lunedì", 1: "martedì", 2: "mercoledì",
+    3: "giovedì", 4: "venerdì", 5: "sabato", 6: "domenica"
+}
+
 # ---------------------------------------------------------------------------
 # State helpers (debt + offset stored in state.json in the repo)
 # ---------------------------------------------------------------------------
@@ -35,6 +40,9 @@ def commit_state():
     if result.returncode != 0:  # there are changes to commit
         subprocess.run(["git", "commit", "-m", "chore: update coffee state [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
+
+def format_date_it(date):
+    return f"{DAYS_IT[date.weekday()]} {date.strftime('%d/%m')}"
 
 # ---------------------------------------------------------------------------
 # Rotation logic
@@ -101,14 +109,14 @@ def handle_skipday(state):
     skipped = state.setdefault("skipped_days", [])
 
     if iso in skipped:
-        send_message(f"⚠️ Il {target.strftime('%A %d/%m')} era già segnato come saltato.")
+        send_message(f"⚠️ Il {format_date_it(target)} era già segnato come saltato.")
         return
 
     skipped.append(iso)
     save_state(state)
     commit_state()
     send_message(
-        f"🚫 Niente caffè il *{target.strftime('%A %d/%m')}*. Giornata saltata, nessun debito.",
+        f"🚫 Niente caffè il *{format_date_it(target)}*. Giornata saltata, nessun debito.",
         parse_mode="Markdown"
     )
 
