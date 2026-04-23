@@ -50,6 +50,18 @@ def get_payer_for_date(date, offset=0):
 def get_today_payer(offset=0):
     return get_payer_for_date(datetime.date.today(), offset)
 
+def get_next_coffee_day():
+    """Return the closest upcoming (or today's) Tuesday or Thursday."""
+    today = datetime.date.today()
+    # If today is already a coffee day, skip today itself
+    if today.weekday() in (1, 3):  # 1=Tuesday, 3=Thursday
+        return today
+    # Otherwise find the next one
+    for i in range(1, 7):
+        candidate = today + datetime.timedelta(days=i)
+        if candidate.weekday() in (1, 3):
+            return candidate
+
 # ---------------------------------------------------------------------------
 # Telegram helpers
 # ---------------------------------------------------------------------------
@@ -78,6 +90,27 @@ def find_person(name_fragment):
 # ---------------------------------------------------------------------------
 # Command handlers
 # ---------------------------------------------------------------------------
+
+def handle_skipday(state):
+    """
+    /skipday  →  Skip the closest Tuesday or Thursday.
+    No args, no debt, rotation unchanged.
+    """
+    target = get_next_coffee_day()
+    iso = target.isoformat()
+    skipped = state.setdefault("skipped_days", [])
+
+    if iso in skipped:
+        send_message(f"⚠️ Il {target.strftime('%A %d/%m')} era già segnato come saltato.")
+        return
+
+    skipped.append(iso)
+    save_state(state)
+    commit_state()
+    send_message(
+        f"🚫 Niente caffè il *{target.strftime('%A %d/%m')}*. Giornata saltata, nessun debito.",
+        parse_mode="Markdown"
+    )
 
 def handle_skip(args, state):
     """
@@ -223,6 +256,8 @@ def dispatch_command(text, state):
         handle_oh(state)
     elif cmd == "/index":
         handle_index()
+    elif cmd == "/skipday":
+        handle_skipday(state)
     elif cmd == "/help":
         send_message(
             "☕ *Coffee Bot comandi:*\n\n"
