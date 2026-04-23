@@ -285,6 +285,10 @@ def dispatch_command(text, state):
 def run_scheduled():
     """Called by the cron workflow: send the daily reminder."""
     state = load_state()
+    today = get_next_coffee_day()
+    if today.isoformat() in state.get("skipped_days", []):
+        print(f"Reminder: {format_date_it(today)} è segnato come giornata saltata.")
+        return
     payer, _ = get_today_payer(state["offset"])
     message = f"☕ Oggi è il turno di {payer} offrire il caffè! Paga brutto cane! 💸"
     send_message(message)
