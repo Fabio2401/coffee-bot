@@ -5,5 +5,8 @@
     "Bounk": 0,
     "Bottaz": 0
   },
-  "offset": 0
+  "offset": 0,
+  "skipped_days": [
+    "2026-04-23"
+  ]
 }
