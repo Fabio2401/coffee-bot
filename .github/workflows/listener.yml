@@ -32,4 +32,4 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO: ${{ github.repository }}
-        run: python bot.py poll
+        run: python -u bot.py poll

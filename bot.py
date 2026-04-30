@@ -32,14 +32,26 @@ def save_state(state):
         json.dump(state, f, indent=2)
 
 def commit_state():
-    """Commit state.json back to the repo via git."""
+    """Commit state.json back to the repo via git, with retry on push conflict."""
+    import time
     subprocess.run(["git", "config", "user.email", "coffee-bot@github-actions"], check=True)
     subprocess.run(["git", "config", "user.name", "Coffee Bot"], check=True)
     subprocess.run(["git", "add", STATE_FILE], check=True)
     result = subprocess.run(["git", "diff", "--cached", "--quiet"])
-    if result.returncode != 0:  # there are changes to commit
-        subprocess.run(["git", "commit", "-m", "chore: update coffee state [skip ci]"], check=True)
-        subprocess.run(["git", "push"], check=True)
+    if result.returncode == 0:
+        return  # nothing to commit
+
+    subprocess.run(["git", "commit", "-m", "chore: update coffee state [skip ci]"], check=True)
+
+    for attempt in range(3):
+        push = subprocess.run(["git", "push"])
+        if push.returncode == 0:
+            return
+        # Pull and rebase, then retry
+        subprocess.run(["git", "pull", "--rebase"], check=True)
+        time.sleep(2)
+
+    print("⚠️ Could not push state after 3 attempts, skipping.")
 
 def format_date_it(date):
     return f"{DAYS_IT[date.weekday()]} {date.strftime('%d/%m')}"
@@ -197,11 +209,7 @@ def handle_oh(state):
     today = datetime.date.today()
     send_message(f"☕ Oggi ({today.strftime('%A %d/%m')}) tocca a *{payer}*!", parse_mode="Markdown")
 
-def handle_index():
-    """
-    /index  →  Current market price of Arabica coffee futures (KC=F) from Yahoo Finance.
-    Uses the Yahoo Finance v8 chart API — no API key required.
-    """
+def handle_index(state):
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/KC=F"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -223,22 +231,37 @@ def handle_index():
             send_message("⚠️ Prezzo non disponibile al momento. Riprova tra poco.")
             return
 
-        # Price is in cents/pound — convert to $/pound and $/kg for context
+        # Store baseline on first ever call
+        if state.get("baseline_price") is None:
+            state["baseline_price"] = price
+            save_state(state)
+            commit_state()
+
         price_usd_lb = price / 100
         price_usd_kg = price_usd_lb * 2.20462
 
+        # Day change
         change_str = ""
         if prev_close:
             change = price - prev_close
             pct = (change / prev_close) * 100
             arrow = "📈" if change >= 0 else "📉"
             sign = "+" if change >= 0 else ""
-            change_str = f"\n{arrow} Variazione: {sign}{change:.2f}¢ ({sign}{pct:.2f}%)"
+            change_str = f"\n{arrow} Oggi: {sign}{change:.2f}¢ ({sign}{pct:.2f}%)"
+
+        # Since bot creation
+        baseline = state["baseline_price"]
+        total_change = price - baseline
+        total_pct = (total_change / baseline) * 100
+        total_arrow = "📈" if total_change >= 0 else "📉"
+        total_sign = "+" if total_change >= 0 else ""
+        since_str = f"\n{total_arrow} Dal primo /index: {total_sign}{total_change:.2f}¢ ({total_sign}{total_pct:.2f}%)"
 
         msg = (
             f"☕ *Caffè Arabica — Futures ({name})*\n\n"
             f"💵 Prezzo: *{price:.2f}¢/lb* ({price_usd_lb:.2f} $/lb · {price_usd_kg:.2f} $/kg)"
-            f"{change_str}\n"
+            f"{change_str}"
+            f"{since_str}\n"
             f"🕐 Aggiornato: {dt_str}"
         )
         send_message(msg, parse_mode="Markdown")
@@ -263,7 +286,7 @@ def dispatch_command(text, state):
     elif cmd == "/oh":
         handle_oh(state)
     elif cmd == "/index":
-        handle_index()
+        handle_index(state)
     elif cmd == "/skipday":
         handle_skipday(state)
     elif cmd == "/help":
@@ -294,27 +317,28 @@ def run_scheduled():
     send_message(message)
 
 def run_polling():
-    """
-    Called by the long-running listener workflow.
-    Polls Telegram for commands and handles them.
-    Exits after ~50 minutes so GitHub Actions can restart it before the 6h limit.
-    """
     state = load_state()
     last_update_id = None
     deadline = datetime.datetime.utcnow() + datetime.timedelta(minutes=50)
 
     print("Coffee bot listener started, polling for commands…")
     while datetime.datetime.utcnow() < deadline:
-        updates = get_updates(last_update_id)
+        try:
+            updates = get_updates(last_update_id)
+        except Exception as e:
+            print(f"Warning: get_updates failed: {e}")
+            continue  # don't crash, just retry
+
         for update in updates:
             last_update_id = update["update_id"] + 1
             message = update.get("message", {})
             text = message.get("text", "")
-            # Only handle commands
             if text.startswith("/"):
-                # Reload state before each command in case it changed
-                state = load_state()
-                dispatch_command(text, state)
+                try:
+                    state = load_state()
+                    dispatch_command(text, state)
+                except Exception as e:
+                    print(f"Warning: error handling command '{text}': {e}")
 
 if __name__ == "__main__":
     import sys
