@@ -3,10 +3,10 @@
     "Fabio": 0,
     "Gabri": 0,
     "Bounk": 0,
-    "Bottaz": 0,
+    "Bottaz": 1,
     "Bonuk": 1
   },
-  "offset": 0,
+  "offset": 1,
   "skipped_days": [
     "2026-04-23"
   ],
