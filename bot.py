@@ -309,6 +309,8 @@ def dispatch_command(text, state):
         handle_index(state)
     elif cmd == "/skipday":
         handle_skipday(state)
+    elif cmd == "/bottazgay":
+        send_message("Sì, Bottaz è proprio il capo dei gay! 🏳️‍🌈")
     elif cmd == "/help":
         send_message(
             "☕ *Coffee Bot comandi:*\n\n"
