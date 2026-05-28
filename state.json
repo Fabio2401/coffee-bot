@@ -1,12 +1,12 @@
 {
   "debts": {
-    "Fabio": 0,
+    "Fabio": 1,
     "Gabri": 0,
     "Bounk": 0,
     "Bottaz": 1,
     "Bonuk": 1
   },
-  "offset": 1,
+  "offset": 2,
   "skipped_days": [
     "2026-04-23"
   ],
