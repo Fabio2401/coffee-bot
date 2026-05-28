@@ -2,11 +2,13 @@
   "debts": {
     "Fabio": 0,
     "Gabri": 0,
-    "Bonuk": 0,
+    "Bonuk": 1,
     "Bottaz": 0
   },
   "offset": 3,
   "skipped_days": [],
   "baseline_price": 271.6,
-  "override_queue": []
+  "override_queue": [
+    "Bonuk"
+  ]
 }
