@@ -145,6 +145,47 @@ def handle_skip(args, state):
 
     if queue and queue[0] == skipper:
         # Already in queue as makeup — just postpone, no extra debt
+        # Today's payer is the next person in normal rotation
+        today_payer, _ = get_payer_for_date(datetime.date.today(), (state["offset"] + 1) % len(PEOPLE))
+        save_state(state)
+        commit_state()
+        send_message(
+            f"⏭️ {skipper} rimanda ancora il suo caffè di recupero.\n"
+            f"☕ Oggi tocca a *{today_payer}*!\n"
+            f"{skipper} dovrà pagare al prossimo turno disponibile.",
+            parse_mode="Markdown"
+        )
+    else:
+        # Fresh skip — add debt and queue
+        state["debts"][skipper] = state["debts"].get(skipper, 0) + 1
+        queue.append(skipper)
+
+        # Today's payer: next in queue if one existed, otherwise next in rotation
+        if len(queue) > 1:
+            today_payer = queue[0]  # someone was already queued up
+        else:
+            today_payer, _ = get_payer_for_date(datetime.date.today(), (state["offset"] + 1) % len(PEOPLE))
+
+        save_state(state)
+        commit_state()
+        send_message(
+            f"⏭️ {skipper} salta il turno (debito +1).\n"
+            f"☕ Oggi tocca a *{today_payer}*!\n"
+            f"{skipper} dovrà pagare al prossimo turno disponibile.",
+            parse_mode="Markdown"
+        )
+    if args:
+        skipper = find_person(args[0])
+        if not skipper:
+            send_message(f"❓ Non ho capito chi è '{args[0]}'. Persone valide: {', '.join(PEOPLE)}")
+            return
+    else:
+        skipper, _ = get_today_payer(state["offset"])
+
+    queue = state.setdefault("override_queue", [])
+
+    if queue and queue[0] == skipper:
+        # Already in queue as makeup — just postpone, no extra debt
         next_coffee = get_next_coffee_day()
         save_state(state)
         commit_state()
