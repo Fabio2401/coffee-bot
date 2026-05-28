@@ -3,12 +3,15 @@
     "Fabio": 0,
     "Gabri": 0,
     "Bounk": 0,
-    "Bottaz": 0,
+    "Bottaz": 1,
     "Bonuk": 0
   },
   "offset": 0,
   "skipped_days": [
     "2026-04-23"
   ],
-  "baseline_price": 271.6
+  "baseline_price": 271.6,
+  "override_queue": [
+    "Bottaz"
+  ]
 }
