@@ -133,10 +133,6 @@ def handle_skipday(state):
     )
 
 def handle_skip(args, state):
-    """
-    /skip [name]  →  [name] didn't show up; move to the next person in rotation.
-    If no name given, assumes today's scheduled payer.
-    """
     if args:
         skipper = find_person(args[0])
         if not skipper:
@@ -145,20 +141,36 @@ def handle_skip(args, state):
     else:
         skipper, _ = get_today_payer(state["offset"])
 
-    # Add debt to skipper
-    state["debts"][skipper] = state["debts"].get(skipper, 0) + 1
+    queue = state.setdefault("override_queue", [])
 
-    # Advance the rotation offset by 1 so the *next* person pays instead
-    state["offset"] = (state["offset"] + 1) % len(PEOPLE)
-    next_payer, _ = get_today_payer(state["offset"])
-
-    save_state(state)
-    commit_state()
-    send_message(
-        f"⏭️ {skipper} salta il turno (debito +1).\n"
-        f"☕ Adesso tocca a *{next_payer}*!",
-        parse_mode="Markdown"
-    )
+    if queue and queue[0] == skipper:
+        # Already in queue as makeup — just postpone, no extra debt
+        next_coffee = get_next_coffee_day()
+        save_state(state)
+        commit_state()
+        send_message(
+            f"⏭️ {skipper} rimanda ancora il suo caffè di recupero.\n"
+            f"☕ Dovrà pagare al prossimo turno disponibile.",
+            parse_mode="Markdown"
+        )
+    else:
+        # Fresh skip — add debt and queue
+        state["debts"][skipper] = state["debts"].get(skipper, 0) + 1
+        queue.append(skipper)
+        save_state(state)
+        commit_state()
+        send_message(
+            f"⏭️ {skipper} salta il turno (debito +1).\n"
+            f"☕ Dovrà pagare al prossimo turno disponibile.",
+            parse_mode="Markdown"
+        )
+        
+def get_effective_payer(state):
+    queue = state.get("override_queue", [])
+    if queue:
+        return queue[0]
+    payer, _ = get_today_payer(state["offset"])
+    return payer
 
 def handle_extra(state):
     """
@@ -204,8 +216,7 @@ def handle_paid(args, state):
     send_message(msg)
 
 def handle_oh(state):
-    """/who  →  Who pays today (or next scheduled day)."""
-    payer, _ = get_today_payer(state["offset"])
+    payer = get_effective_payer(state)
     today = datetime.date.today()
     send_message(f"☕ Oggi ({today.strftime('%A %d/%m')}) tocca a *{payer}*!", parse_mode="Markdown")
 
@@ -306,13 +317,21 @@ def dispatch_command(text, state):
 # ---------------------------------------------------------------------------
 
 def run_scheduled():
-    """Called by the cron workflow: send the daily reminder."""
     state = load_state()
     today = get_next_coffee_day()
     if today.isoformat() in state.get("skipped_days", []):
         print(f"Reminder: {format_date_it(today)} è segnato come giornata saltata.")
         return
-    payer, _ = get_today_payer(state["offset"])
+
+    payer = get_effective_payer(state)
+
+    queue = state.get("override_queue", [])
+    if queue:
+        queue.pop(0)  # consume the first override
+        state["override_queue"] = queue
+        save_state(state)
+        commit_state()
+
     message = f"☕ Oggi è il turno di {payer} offrire il caffè! Paga brutto cane! 💸"
     send_message(message)
 
