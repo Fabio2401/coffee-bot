@@ -6,7 +6,9 @@
     "Bottaz": 0
   },
   "offset": 3,
-  "skipped_days": [],
+  "skipped_days": [
+    "2026-06-02"
+  ],
   "baseline_price": 271.6,
   "override_queue": []
 }
