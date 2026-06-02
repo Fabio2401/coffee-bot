@@ -8,7 +8,5 @@
   "offset": 3,
   "skipped_days": [],
   "baseline_price": 271.6,
-  "override_queue": [
-    "Bonuk"
-  ]
+  "override_queue": []
 }
